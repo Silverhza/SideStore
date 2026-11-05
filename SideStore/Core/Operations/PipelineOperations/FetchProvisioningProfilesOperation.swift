@@ -182,10 +182,26 @@ class FetchProvisioningProfilesOperation: BasePipelineOperation<InstallAppOperat
         
         self.debugLog("[FetchProvisioningProfiles] Updating app groups for App ID \(updatedAppID.bundleIdentifier)...")
         let groupAppID = try await self.updateAppGroups(for: updatedAppID, targetAppBundle: targetAppBundle, team: team)
+
+        let requiresIncreasedMemoryLimit = IncreasedMemoryLimitCapability.isRequested(
+            original: targetAppBundle.entitlements,
+            custom: self.context.customEntitlementsByBundleID[targetAppBundle.bundleIdentifier],
+            additionalValue: parentAppBundle == nil
+                ? self.context.additionalEntitlements[.increasedMemoryLimit] : nil
+        )
+        if requiresIncreasedMemoryLimit {
+            // Reassert after legacy updates, even when their features did not change.
+            // Both installation and profile-only refresh pass through this path.
+            try await DeveloperPortalProxy.shared.enableIncreasedMemoryLimit(for: groupAppID, team: team)
+        }
         
         verboseLog(targetAppBundle.dumpMachOInfo())
         self.debugLog("[FetchProvisioningProfiles] Fetching provisioning profile from Apple for App ID \(groupAppID.bundleIdentifier)...")
         let profile = try await DeveloperPortalProxy.shared.downloadProvisioningProfile(for: groupAppID, deviceType: DeveloperPortalProxy.currentDeviceType, team: team)
+        if requiresIncreasedMemoryLimit,
+           profile.entitlements[.increasedMemoryLimit] as? Bool != true {
+            throw OperationError.invalidApp(reason: "Apple's provisioning profile for '\(groupAppID.bundleIdentifier)' does not authorize Increased Memory Limit. Signing would drop the requested entitlement.")
+        }
         self.debugLog("[FetchProvisioningProfiles] Provisioning profile fetched for \(groupAppID.bundleIdentifier) (Name: \(profile.name), Expiration: \(String(describing: profile.expirationDate)))")
         return profile
     }
@@ -247,6 +263,8 @@ private extension FetchProvisioningProfilesOperation{
         
         // Filter applicable features
         for (key, value) in entitlements {
+            // This capability uses the modern JSON API after all legacy updates.
+            if key == ALTEntitlement.increasedMemoryLimit.rawValue { continue }
             guard let feature = ALTFeature(entitlement: ALTEntitlement(rawValue: key)) else { 
                 continue 
             }

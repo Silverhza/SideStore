@@ -118,6 +118,39 @@ public class DeveloperPortalProxy {
         return try await ALTAppleAPI.shared.updateAppID(appID, team: team, session: session)
     }
 
+    public func enableIncreasedMemoryLimit(for appID: ALTAppID, team: ALTTeam) async throws {
+        let session = try await self.getSession()
+        let api = ALTAppleAPI.shared
+        let headers = api.customHeaders
+        let anisette = session.anisetteData
+        let request = try IncreasedMemoryLimitCapability.makeRequest(
+            baseURL: api.servicesBaseURL,
+            appID: appID.identifier,
+            name: appID.name,
+            bundleIdentifier: appID.bundleIdentifier,
+            teamID: team.identifier,
+            headers: [
+                "User-Agent": headers.developerServices.userAgent,
+                "Accept-Language": "en-us",
+                "X-Apple-App-Info": headers.grandSlam.authApp,
+                "X-Xcode-Version": session.xcodeVersion,
+                "X-Apple-I-Identity-Id": session.dsid,
+                "X-Apple-GS-Token": session.authToken,
+                "X-Apple-I-MD-M": anisette.machineID,
+                "X-Apple-I-MD": anisette.oneTimePassword,
+                "X-Apple-I-MD-LU": anisette.localUserID,
+                "X-Apple-I-MD-RINFO": anisette.routingInfo,
+                "X-Mme-Device-Id": anisette.deviceID,
+                "X-MMe-Client-Info": anisette.clientInfo,
+                "X-Apple-I-Client-Time": anisette.clientTime,
+                "X-Apple-Locale": anisette.locale,
+                "X-Apple-I-Locale": anisette.locale,
+                "X-Apple-I-TimeZone": anisette.timeZone
+            ]
+        )
+        try await IncreasedMemoryLimitCapability.enable(using: request)
+    }
+
     @discardableResult
     public func deleteAppID(_ appID: ALTAppID, team: ALTTeam? = nil) async throws -> Bool {
         let session = try await self.getSession()

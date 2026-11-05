@@ -12,7 +12,6 @@ import SideSign
 struct OperationEntitlements {
     static let defaultAdditionalEntitlements: [ALTEntitlement: any Sendable] = [
         .increasedDebuggingMemoryLimit  : ALTEntitlement.increasedDebuggingMemoryLimit,
-        .increasedMemoryLimit           : ALTEntitlement.increasedMemoryLimit,
         .extendedVirtualAddressing      : ALTEntitlement.extendedVirtualAddressing
     ]
 }
